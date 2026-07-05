@@ -1,0 +1,4 @@
+cryptography
+eth-account
+websockets
+python-dotenv
