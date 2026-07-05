@@ -51,6 +51,7 @@ class TradingEngine:
         self.halted_today = False
         self.warned_external: set[str] = set()
         self.warned_tpsl_unsupported = False
+        self.entries_enabled = True   # False: yeni giris yok, acik pozisyon yonetimi surer
         self.trades = 0
         self.wins = 0
         self.total_pnl = 0.0
@@ -248,7 +249,7 @@ class TradingEngine:
                 self._begin_close(sym, tracked, "Ters sinyal geldi")
             return
 
-        if self.halted_today:
+        if self.halted_today or not self.entries_enabled:
             return
         if size != 0:
             if sym not in self.warned_external:
