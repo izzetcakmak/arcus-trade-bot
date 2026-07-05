@@ -2,3 +2,6 @@ cryptography
 eth-account
 websockets
 python-dotenv
+fastapi
+uvicorn[standard]
+google-auth
