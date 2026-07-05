@@ -22,15 +22,24 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from arcus.client import ArcusClient, ArcusError, canonical
-from web import db, security
+from web import db, security, notifier
+from web.funding import fund_user_async, fund_status, MAX_FUND_USD
+from web.multiengine import start_manager, get_state
 from web.pages import LOGIN_PAGE, APP_PAGE
 
 ENV = dotenv_values(os.path.join(BASE_DIR, ".env"))
 ARCUS_BASE = ENV.get("ARCUS_BASE", "https://api.testnet.arcus.xyz")
 GOOGLE_CLIENT_ID = (ENV.get("GOOGLE_CLIENT_ID") or "").strip()
+SPONSOR_KEY = (ENV.get("WALLET_PRIVATE_KEY") or "").strip()
 
 app = FastAPI(title="ArcusBot Web")
 db.init()
+
+
+@app.on_event("startup")
+def _startup():
+    notifier.start_poller()
+    start_manager()
 
 SETTING_LIMITS = {
     "leverage": (1, 50, True), "margin_usd": (5, 1_000_000, False),
@@ -250,6 +259,61 @@ async def api_settings(request: Request):
         return JSONResponse({"error": "nothing to change"}, status_code=400)
     db.update_settings(user["id"], **changes)
     return {"ok": True, "applied": changes}
+
+
+@app.post("/api/fund")
+async def api_fund(request: Request):
+    """Tek tik testnet fonlama: sponsor gas + USDG mint + deposit (arka planda)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    w = db.get_wallet(user["id"])
+    if not w:
+        return JSONResponse({"error": "create a wallet first"}, status_code=409)
+    if not SPONSOR_KEY:
+        return JSONResponse({"error": "funding not configured"}, status_code=503)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    amount = int(body.get("amount_usd", 10_000))
+    if not (100 <= amount <= MAX_FUND_USD):
+        return JSONResponse({"error": f"amount must be 100..{MAX_FUND_USD}"},
+                            status_code=400)
+    started = fund_user_async(user["id"], security.decrypt(w["enc_wallet_key"]),
+                              SPONSOR_KEY, amount)
+    if not started:
+        return JSONResponse({"error": "funding already in progress"},
+                            status_code=409)
+    return {"ok": True}
+
+
+@app.get("/api/fund/status")
+def api_fund_status(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    return fund_status.get(user["id"]) or {"stage": None}
+
+
+@app.post("/api/telegram/link")
+def api_telegram_link(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    url = notifier.make_link(user["id"])
+    if not url:
+        return JSONResponse({"error": "telegram bot not configured"},
+                            status_code=503)
+    return {"ok": True, "url": url}
+
+
+@app.get("/api/botstate")
+def api_botstate(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    return get_state(user["id"])
 
 
 @app.post("/api/bot/{action}")

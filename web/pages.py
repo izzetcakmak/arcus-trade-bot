@@ -50,8 +50,12 @@ var I18N = {
                    'the server will never display them again.',
      reveal:'Reveal my keys (one time)', saved:'I saved them — continue',
      walletaddr:'Wallet address', wkey:'Wallet private key', akey:'Arcus API private key',
-     acct:'Account', notfunded:'Not funded yet. One-click testnet funding is coming next — '+
-          'or deposit manually to your address on Robinhood Chain testnet.',
+     acct:'Account', notfunded:'Not funded yet — get free testnet collateral with one click.',
+     fund:'Fund my account ($10,000 testnet)', fundprog:'Funding: ',
+     funddone:'Deposit sent — balance appears within ~1 minute.',
+     tglinkbtn:'Link my Telegram', tglinked:'Telegram linked ✓',
+     tgopen:'Telegram opened — press START in the chat; this page updates automatically.',
+     events:'Recent events', engon:'engine running', engoff:'engine starting…',
      equity:'Equity', free:'Free collateral', positions:'Open positions', nopos:'none',
      risk:'Risk Settings', plow:'Low Risk', pmid:'Balanced', phigh:'High Risk',
      lev:'Leverage (x)', margin:'Margin per trade ($)', sl:'Stop-loss (% of margin)',
@@ -73,8 +77,12 @@ var I18N = {
                    'sonra sunucu bir daha asla göstermez.',
      reveal:'Key\\'lerimi göster (tek sefer)', saved:'Kaydettim — devam',
      walletaddr:'Cüzdan adresi', wkey:'Cüzdan private key', akey:'Arcus API private key',
-     acct:'Hesap', notfunded:'Henüz fonlanmadı. Tek tık testnet fonlama bir sonraki fazda — '+
-          'ya da Robinhood Chain testnet\\'te adresine manuel yatır.',
+     acct:'Hesap', notfunded:'Henüz fonlanmadı — tek tıkla ücretsiz testnet teminatı al.',
+     fund:'Hesabımı fonla ($10.000 testnet)', fundprog:'Fonlama: ',
+     funddone:'Yatırma gönderildi — bakiye ~1 dakika içinde görünür.',
+     tglinkbtn:'Telegram\\'ımı bağla', tglinked:'Telegram bağlı ✓',
+     tgopen:'Telegram açıldı — sohbette START\\'a bas; bu sayfa otomatik güncellenir.',
+     events:'Son olaylar', engon:'motor çalışıyor', engoff:'motor başlıyor…',
      equity:'Equity', free:'Serbest teminat', positions:'Açık pozisyonlar', nopos:'yok',
      risk:'Risk Ayarları', plow:'Düşük Risk', pmid:'Dengeli', phigh:'Yüksek Risk',
      lev:'Kaldıraç (x)', margin:'İşlem başı teminat ($)', sl:'Stop-loss (teminatın %\\'si)',
@@ -191,7 +199,9 @@ function render(){
        p.upnl.toFixed(2)+'</td></tr>';}).join('')+'</table>'
     : '<p class="muted">'+t('nopos')+'</p>';
   } else {
-   h += '<div class="warn">'+t('notfunded')+'</div>';
+   h += '<div class="warn">'+t('notfunded')+'</div>'+
+    '<p><button class="btn" id="fundbtn" onclick="fund()">'+t('fund')+'</button></p>'+
+    '<div id="fundmsg" class="muted"></div>';
   }
   h += '</div>';
 
@@ -217,11 +227,16 @@ function render(){
    '<p><b class="'+(on?'pos':'neg')+'">'+(on?t('boton'):t('botoff'))+'</b></p>'+
    '<button class="btn '+(on?'red':'')+'" onclick="toggleBot('+(on?0:1)+')">'+
     (on?t('stop'):t('start'))+'</button>'+
-   '<p class="muted">'+t('botnote')+'</p></div>';
+   '<div id="botstate"></div></div>';
 
-  h += '<div class="card"><h3>'+t('tg')+'</h3><p class="muted">'+t('tgnote')+'</p></div>';
+  h += '<div class="card"><h3>'+t('tg')+'</h3>'+
+   (ME.telegram_linked
+    ? '<p class="pos">'+t('tglinked')+'</p>'
+    : '<button class="btn sec" onclick="tgLink()">'+t('tglinkbtn')+'</button>'+
+      '<div id="tgmsg" class="muted"></div>')+'</div>';
  }
  document.getElementById('root').innerHTML = h;
+ setTimeout(loadState, 100);
 }
 function fld(id, label, val){
  return '<div><label>'+label+'</label><input id="f_'+id+'" type="number" value="'+esc(val)+'"></div>';
@@ -258,5 +273,48 @@ async function toggleBot(on){
  await load();
 }
 async function logout(){ await fetch('/logout',{method:'POST'}); location.reload(); }
+async function fund(){
+ var b = document.getElementById('fundbtn'); if(b) b.disabled = true;
+ var r = await fetch('/api/fund', {method:'POST',
+   headers:{'Content-Type':'application/json'}, body:JSON.stringify({amount_usd:10000})});
+ if(!r.ok){ alert((await r.json()).error); if(b) b.disabled=false; return; }
+ pollFund();
+}
+async function pollFund(){
+ var d = await (await fetch('/api/fund/status')).json();
+ var m = document.getElementById('fundmsg');
+ if(d.error){ if(m){ m.textContent=t('err')+d.error; m.className='neg'; } return; }
+ if(m){ m.textContent = t('fundprog') + (d.stage||'…'); m.className='muted'; }
+ if(d.done){ if(m) m.textContent = t('funddone');
+  setTimeout(load, 15000); setTimeout(load, 45000); return; }
+ setTimeout(pollFund, 4000);
+}
+async function tgLink(){
+ var r = await fetch('/api/telegram/link', {method:'POST'});
+ var d = await r.json();
+ if(d.ok){ window.open(d.url, '_blank');
+  var m=document.getElementById('tgmsg'); if(m) m.textContent=t('tgopen'); pollTg(); }
+ else alert(d.error||'?');
+}
+async function pollTg(){
+ var me = await (await fetch('/api/me')).json();
+ if(me.telegram_linked){ ME = me; render(); return; }
+ setTimeout(pollTg, 4000);
+}
+async function loadState(){
+ if(!(ME && ME.settings && ME.settings.bot_active)) return;
+ var el = document.getElementById('botstate'); if(!el) return;
+ try{
+  var d = await (await fetch('/api/botstate')).json();
+  var s = d.snapshot || {};
+  var hh = '<p class="muted">'+(d.running?t('engon'):t('engoff'))+'</p>';
+  if(s.equity!=null) hh += '<p>Equity: <b>$'+s.equity.toFixed(2)+'</b></p>';
+  var ev = d.events || [];
+  if(ev.length) hh += '<label>'+t('events')+'</label><pre style="max-height:160px;overflow-y:auto">'+
+    ev.map(esc).join('\\n')+'</pre>';
+  el.innerHTML = hh;
+ }catch(e){}
+}
+setInterval(loadState, 10000);
 load();
 </script></body></html>""")
