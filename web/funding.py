@@ -71,6 +71,48 @@ def send_tx(acct, to, data=b"", value=0):
     raise TimeoutError(f"tx onaylanmadi: {tx_hash}")
 
 
+def run_fund(user_key_hex: str, sponsor_key_hex: str, amount_usd: int,
+             on_stage=lambda s: None):
+    """Fonlama boru hatti (senkron): gas -> mint -> approve -> deposit."""
+    user = Account.from_key(user_key_hex)
+    amount = int(amount_usd) * 10**6
+    if balance(user.address) < GAS_WEI // 2:
+        sponsor = Account.from_key(sponsor_key_hex)
+        if balance(sponsor.address) < GAS_WEI * 2:
+            raise RuntimeError("sponsor gas tukendi — faucet'ten doldurun")
+        send_tx(sponsor, user.address, value=GAS_WEI)
+    on_stage("mint")
+    send_tx(user, USDG, sel("mint(address,uint256)")
+            + enc_addr(user.address) + enc_uint(amount))
+    on_stage("approve")
+    send_tx(user, USDG, sel("approve(address,uint256)")
+            + enc_addr(PROXY) + enc_uint(amount))
+    on_stage("deposit")
+    send_tx(user, PROXY, sel("initiateDeposit(address,uint16,address,uint256)")
+            + enc_addr(user.address) + enc_uint(0)
+            + enc_addr(USDG) + enc_uint(amount))
+    on_stage("credit")
+
+
+def process_fund_queue(sponsor_key_hex: str, decrypt, get_wallet):
+    """Worker dongusu: kuyruktan istek al, calistir, durumu DB'ye isle."""
+    from web import db
+    req = db.claim_fund_request()
+    if not req:
+        return False
+    try:
+        w = get_wallet(req["user_id"])
+        if not w:
+            raise RuntimeError("cuzdan yok")
+        run_fund(decrypt(w["enc_wallet_key"]), sponsor_key_hex,
+                 req["amount_usd"],
+                 on_stage=lambda s: db.update_fund_request(req["id"], stage=s))
+        db.update_fund_request(req["id"], done=1)
+    except Exception as e:
+        db.update_fund_request(req["id"], error=str(e)[:300])
+    return True
+
+
 def fund_user_async(user_id: int, user_key_hex: str, sponsor_key_hex: str,
                     amount_usd: int):
     """Arka planda fonlar. Ayni kullanici icin es zamanli ikinci istegi reddet."""

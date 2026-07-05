@@ -100,6 +100,7 @@ def _loop():
                         eng.tick()
                     except Exception as e:
                         r["events"].appendleft(f"[!] tick: {e}")
+                    _persist(uid, r)
 
                 # bot'u kapatilanlar: pozisyon varsa yonetmeye devam, yoksa kaldir
                 for uid in list(_runners):
@@ -113,11 +114,26 @@ def _loop():
                             eng.tick()   # SL/TP izleme + cikis yonetimi surer
                         except Exception as e:
                             r["events"].appendleft(f"[!] tick: {e}")
+                        _persist(uid, r)
                     else:
+                        _persist(uid, r, running=False)
                         del _runners[uid]
         except Exception:
             pass
         time.sleep(TICK_SEC)
+
+
+def _persist(uid: int, r: dict, running: bool | None = None):
+    """Durumu veritabanina yazar — web API buradan okur."""
+    try:
+        snap = r["engine"].snapshot() if r["setup_done"] else {}
+    except Exception:
+        snap = {}
+    try:
+        db.upsert_bot_state(uid, r["setup_done"] if running is None else running,
+                            snap, list(r["events"])[:25])
+    except Exception:
+        pass
 
 
 def start_manager():

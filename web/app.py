@@ -23,23 +23,34 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from arcus.client import ArcusClient, ArcusError, canonical
 from web import db, security, notifier
-from web.funding import fund_user_async, fund_status, MAX_FUND_USD
-from web.multiengine import start_manager, get_state
 from web.pages import LOGIN_PAGE, APP_PAGE
 
-ENV = dotenv_values(os.path.join(BASE_DIR, ".env"))
-ARCUS_BASE = ENV.get("ARCUS_BASE", "https://api.testnet.arcus.xyz")
-GOOGLE_CLIENT_ID = (ENV.get("GOOGLE_CLIENT_ID") or "").strip()
-SPONSOR_KEY = (ENV.get("WALLET_PRIVATE_KEY") or "").strip()
+# Not: motor/fonlama/poller BU surecte calismaz (serverless-uyumlu).
+# Onlari worker.py kosturur; iletisim veritabani uzerinden.
+
+def _env(key, default=""):
+    return (os.environ.get(key)
+            or dotenv_values(os.path.join(BASE_DIR, ".env")).get(key)
+            or default)
+
+ARCUS_BASE = _env("ARCUS_BASE", "https://api.testnet.arcus.xyz")
+GOOGLE_CLIENT_ID = _env("GOOGLE_CLIENT_ID").strip()
+MAX_FUND_USD = 25_000
 
 app = FastAPI(title="ArcusBot Web")
-db.init()
+try:
+    db.init()
+    DB_READY = True
+except Exception as _e:   # or. Vercel'de DATABASE_URL henuz bagli degilse
+    DB_READY = False
+    _DB_ERR = str(_e)
 
 
-@app.on_event("startup")
-def _startup():
-    notifier.start_poller()
-    start_manager()
+@app.middleware("http")
+async def _require_db(request: Request, call_next):
+    if not DB_READY and request.url.path.startswith("/api"):
+        return JSONResponse({"error": "database not configured"}, status_code=503)
+    return await call_next(request)
 
 SETTING_LIMITS = {
     "leverage": (1, 50, True), "margin_usd": (5, 1_000_000, False),
@@ -266,15 +277,12 @@ async def api_settings(request: Request):
 
 @app.post("/api/fund")
 async def api_fund(request: Request):
-    """Tek tik testnet fonlama: sponsor gas + USDG mint + deposit (arka planda)."""
+    """Fonlama istegini kuyruga yazar; worker.py zincir islemlerini yapar."""
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
-    w = db.get_wallet(user["id"])
-    if not w:
+    if not db.get_wallet(user["id"]):
         return JSONResponse({"error": "create a wallet first"}, status_code=409)
-    if not SPONSOR_KEY:
-        return JSONResponse({"error": "funding not configured"}, status_code=503)
     try:
         body = await request.json()
     except Exception:
@@ -283,9 +291,7 @@ async def api_fund(request: Request):
     if not (100 <= amount <= MAX_FUND_USD):
         return JSONResponse({"error": f"amount must be 100..{MAX_FUND_USD}"},
                             status_code=400)
-    started = fund_user_async(user["id"], security.decrypt(w["enc_wallet_key"]),
-                              SPONSOR_KEY, amount)
-    if not started:
+    if not db.create_fund_request(user["id"], amount):
         return JSONResponse({"error": "funding already in progress"},
                             status_code=409)
     return {"ok": True}
@@ -296,7 +302,11 @@ def api_fund_status(request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
-    return fund_status.get(user["id"]) or {"stage": None}
+    req = db.latest_fund_request(user["id"])
+    if not req:
+        return {"stage": None}
+    return {"stage": req["stage"], "error": req["error"],
+            "done": bool(req["done"]), "ts": req["created_at"]}
 
 
 @app.post("/api/telegram/link")
@@ -316,7 +326,7 @@ def api_botstate(request: Request):
     user = current_user(request)
     if not user:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
-    return get_state(user["id"])
+    return db.get_bot_state(user["id"])
 
 
 @app.post("/api/bot/{action}")
