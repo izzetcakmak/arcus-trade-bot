@@ -67,9 +67,12 @@ def user_client(user_id: int) -> ArcusClient | None:
                        api_privkey_hex=security.decrypt(w["enc_api_key"]))
 
 
-def set_session(resp: Response, user_id: int):
+def set_session(resp: Response, user_id: int, request: Request | None = None):
+    https = bool(request) and (
+        request.headers.get("x-forwarded-proto", request.url.scheme) == "https")
     resp.set_cookie("session", security.make_session(user_id),
-                    max_age=security.SESSION_TTL, httponly=True, samesite="lax")
+                    max_age=security.SESSION_TTL, httponly=True, samesite="lax",
+                    secure=https)
 
 
 # -------------------------------------------------------------------- sayfa
@@ -96,7 +99,7 @@ async def auth_dev(request: Request):
         return JSONResponse({"error": "invalid email"}, status_code=400)
     user = db.get_or_create_user(email)
     resp = JSONResponse({"ok": True})
-    set_session(resp, user["id"])
+    set_session(resp, user["id"], request)
     return resp
 
 
@@ -118,7 +121,7 @@ async def auth_google(request: Request):
         return JSONResponse({"error": f"token verify failed: {e}"}, status_code=401)
     user = db.get_or_create_user(email, info.get("name", ""), info.get("sub", ""))
     resp = JSONResponse({"ok": True})
-    set_session(resp, user["id"])
+    set_session(resp, user["id"], request)
     return resp
 
 
