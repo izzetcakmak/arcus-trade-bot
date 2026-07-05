@@ -1,0 +1,10 @@
+.env
+.env.*
+*.log
+state.json
+web/arcusweb.db
+docs/
+__pycache__/
+**/__pycache__/
+.git/
+bot.log
