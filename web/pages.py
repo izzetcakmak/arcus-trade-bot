@@ -65,7 +65,8 @@ var I18N = {
      start:'Start bot', stop:'Stop bot',
      botnote:'Multi-user engine ships in the next phase — your settings are stored and ready.',
      tg:'Telegram Notifications', tgnote:'Coming soon: link your Telegram to get '+
-        'position alerts.', err:'Error: '},
+        'position alerts.', err:'Error: ',
+     contact:'Contact', testnet_note:'Testnet only — no real funds.'},
  tr:{tagline:'Arcus testnet üzerinde otomatik perp trade — giriş yap, cüzdanını al, riskini seç.',
      signin:'Giriş yap', devnote:'DEV MODU — Google girişi henüz ayarlı değil; herhangi bir e-posta gir.',
      email:'E-posta', login:'Giriş', logout:'Çıkış',
@@ -92,7 +93,14 @@ var I18N = {
      start:'Botu başlat', stop:'Botu durdur',
      botnote:'Çok kullanıcılı motor bir sonraki fazda geliyor — ayarların kaydedildi, hazır.',
      tg:'Telegram Bildirimleri', tgnote:'Yakında: Telegram\\'ını bağla, pozisyon '+
-        'bildirimleri al.', err:'Hata: '}};
+        'bildirimleri al.', err:'Hata: ',
+     contact:'İletişim', testnet_note:'Yalnızca testnet — gerçek para yok.'}};
+function footer(){
+ return '<div class="muted" style="margin-top:26px;padding-top:12px;border-top:1px solid #21262d">'+
+  t('testnet_note')+' · '+t('contact')+': '+
+  '<a href="mailto:info@atradebot.xyz" style="color:#3fb950;text-decoration:none">info@atradebot.xyz</a>'+
+  ' · <a href="https://github.com/izzetcakmak/arcus-trade-bot" style="color:#8b949e">GitHub</a></div>';
+}
 var lang = localStorage.getItem('lang') || 'en';
 function t(k){ return (I18N[lang]||I18N.en)[k] || k; }
 function setLang(l){ lang=l; localStorage.setItem('lang', l); render(); }
@@ -121,7 +129,7 @@ function render(){
   h += '<div id="gbtn"></div>';
  }
  h += '</div>';
- document.getElementById('root').innerHTML = h;
+ document.getElementById('root').innerHTML = h + footer();
  if(!DEV && window.google && google.accounts){
   google.accounts.id.initialize({client_id: GCID, callback: onGoogle});
   google.accounts.id.renderButton(document.getElementById('gbtn'),
@@ -235,7 +243,7 @@ function render(){
     : '<button class="btn sec" onclick="tgLink()">'+t('tglinkbtn')+'</button>'+
       '<div id="tgmsg" class="muted"></div>')+'</div>';
  }
- document.getElementById('root').innerHTML = h;
+ document.getElementById('root').innerHTML = h + footer();
  setTimeout(loadState, 100);
 }
 function fld(id, label, val){
