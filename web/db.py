@@ -114,3 +114,13 @@ def active_users_with_wallets() -> list[dict]:
             "FROM users u JOIN wallets w ON w.user_id=u.id "
             "JOIN settings s ON s.user_id=u.id WHERE s.bot_active=1").fetchall()
     return [dict(r) for r in rows]
+
+
+def get_user_by_link_token(token: str) -> dict | None:
+    if not token:
+        return None
+    with conn() as c:
+        row = c.execute(
+            "SELECT u.* FROM users u JOIN settings s ON s.user_id=u.id "
+            "WHERE s.telegram_link_token=?", (token,)).fetchone()
+    return dict(row) if row else None
