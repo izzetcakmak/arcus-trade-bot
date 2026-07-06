@@ -29,9 +29,11 @@ from web.pages import LOGIN_PAGE, APP_PAGE
 # Onlari worker.py kosturur; iletisim veritabani uzerinden.
 
 def _env(key, default=""):
-    return (os.environ.get(key)
-            or dotenv_values(os.path.join(BASE_DIR, ".env")).get(key)
-            or default)
+    val = (os.environ.get(key)
+           or dotenv_values(os.path.join(BASE_DIR, ".env")).get(key)
+           or default)
+    # PowerShell/Windows pipe'lari BOM sokabiliyor — gorunmez baytlari temizle
+    return val.replace("﻿", "").strip()
 
 ARCUS_BASE = _env("ARCUS_BASE", "https://api.testnet.arcus.xyz")
 GOOGLE_CLIENT_ID = _env("GOOGLE_CLIENT_ID").strip()
