@@ -14,7 +14,7 @@ commodities, indices) for you — with Telegram alerts for every move.
 
 ▶ Try it free (testnet): https://www.atradebot.xyz
 ▶ Source code: https://github.com/izzetcakmak/arcus-trade-bot
-▶ Full write-up (Medium): [MEDIUM_LINK]
+▶ Full write-up (Medium): (Medium yayinlaninca YouTube Studio'dan aciklamaya ekle)
 ▶ Arcus DEX: https://arcus.xyz
 
 ⚠️ Testnet only — no real funds. Not investment advice.

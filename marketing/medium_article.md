@@ -6,7 +6,7 @@
 
 **TL;DR:** [Arcus](https://arcus.xyz) is the new DEX built by dYdX Labs on Robinhood Chain — stock tokens and perpetuals, 24/7. Perps are waitlisted (I'm somewhere around #32,000), but the **testnet is open to everyone**. So instead of waiting, I built [**ArcusBot**](https://www.atradebot.xyz): a website where anyone can sign in with Google, get a trading wallet, fund it with $10,000 of testnet collateral in one click, pick a risk profile and let a multi-signal strategy trade 41 markets for them. This is the story, including the three invisible-character bugs that almost broke me.
 
-*(Video walkthrough: **[YOUTUBE_LINK_HERE]**)*
+*(Video walkthrough: **https://youtu.be/xqTsFjYLrGc**)*
 
 ---
 
@@ -76,6 +76,6 @@ Every env read in the codebase now strips BOMs and carriage returns, checks `os.
 
 - **Live (testnet, free):** [atradebot.xyz](https://www.atradebot.xyz)
 - **Code (30+ commits of history):** [github.com/izzetcakmak/arcus-trade-bot](https://github.com/izzetcakmak/arcus-trade-bot)
-- **Video walkthrough:** [YOUTUBE_LINK_HERE]
+- **Video walkthrough:** https://youtu.be/xqTsFjYLrGc
 
 *Everything here runs on testnet with paper money. Nothing in this post is investment advice — it's an engineering story about a very patient waitlist position.*
