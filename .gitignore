@@ -6,3 +6,10 @@ __pycache__/
 state.json
 docs/
 *.db
+
+.vercel
+.env*
+marketing/shots/
+marketing/audio/
+marketing/work/
+*.mp4
