@@ -289,6 +289,7 @@ var APPI18N = {
      start:'Start bot', stop:'Stop bot',
      tg:'Telegram notifications', tglinkbtn:'Link my Telegram', tglinked:'Telegram linked',
      tgopen:'Telegram opened — press START in the chat; this page updates automatically.',
+     tgchange:'Change / unlink', tgwarn:'Open the link on the phone whose Telegram should receive the alerts.',
      events:'Recent events', engon:'engine running', engoff:'engine starting…',
      err:'Error: '},
  tr:{logout:'Çıkış',
@@ -314,6 +315,7 @@ var APPI18N = {
      start:'Botu başlat', stop:'Botu durdur',
      tg:'Telegram bildirimleri', tglinkbtn:'Telegram\\'ımı bağla', tglinked:'Telegram bağlı',
      tgopen:'Telegram açıldı — sohbette START\\'a bas; bu sayfa otomatik güncellenir.',
+     tgchange:'Değiştir / bağlantıyı kes', tgwarn:'Linki, bildirimleri alacak telefonun Telegram\\'ında aç.',
      events:'Son olaylar', engon:'motor çalışıyor', engoff:'motor başlıyor…',
      err:'Hata: '}};
 var lang = localStorage.getItem('lang') || 'en';
@@ -557,9 +559,11 @@ function render(){
 
   // telegram
   var tg = ME.telegram_linked
-   ? '<p style="margin:0"><span class="chip up">✓ '+t('tglinked')+'</span></p>'
+   ? '<p style="margin:0 0 12px"><span class="chip up">✓ '+t('tglinked')+'</span></p>'+
+     '<button class="pill ghost small" onclick="tgUnlink()">'+t('tgchange')+'</button>'
    : '<button class="pill ghost" onclick="tgLink()">'+t('tglinkbtn')+'</button>'+
-     '<div id="tgmsg" class="muted" style="margin-top:10px"></div>';
+     '<div class="muted" style="margin-top:10px;font-size:.75rem">'+t('tgwarn')+'</div>'+
+     '<div id="tgmsg" class="muted" style="margin-top:6px"></div>';
   h += card(t('tg'), tg);
  }
  h += '</div>' + pageFooter();
@@ -677,6 +681,10 @@ async function tgLink(){
    '<div class="muted" style="margin-top:10px">'+t('tgopen')+'</div>';
   pollTg();
  } else alert(d.error||'?');
+}
+async function tgUnlink(){
+ await fetch('/api/telegram/unlink', {method:'POST'});
+ await load();
 }
 async function pollTg(){
  var me = await (await fetch('/api/me')).json();

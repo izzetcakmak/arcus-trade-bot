@@ -339,6 +339,16 @@ def api_telegram_link(request: Request):
     return {"ok": True, "url": url}
 
 
+@app.post("/api/telegram/unlink")
+def api_telegram_unlink(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    db.update_settings(user["id"], telegram_chat_id=None,
+                       telegram_link_token=None)
+    return {"ok": True}
+
+
 @app.get("/api/botstate")
 def api_botstate(request: Request):
     user = current_user(request)
