@@ -168,6 +168,22 @@ _STYLE = """
  .preset .t{font-weight:600;font-size:.95rem}
  .preset .d{font-size:.72rem;color:var(--muted);margin-top:6px;line-height:1.6}
 
+ /* --- sembol secici --- */
+ .symtabs{display:flex;gap:6px;flex-wrap:wrap;background:#161618;
+      border:1px solid var(--line2);border-radius:980px;padding:5px;width:fit-content;
+      max-width:100%;margin-bottom:14px}
+ .symtabs .tab{border:0;background:transparent;color:var(--muted);cursor:pointer;
+      border-radius:980px;padding:7px 16px;font-size:.82rem;font-family:inherit;
+      transition:.2s;white-space:nowrap}
+ .symtabs .tab.act{background:#2c2c2e;color:var(--text);font-weight:600}
+ .chips{display:flex;flex-wrap:wrap;gap:8px}
+ .mchip{border:1px solid var(--line2);background:#161618;color:var(--muted);
+      border-radius:980px;padding:7px 14px;font-size:.8rem;cursor:pointer;
+      font-family:inherit;transition:.15s}
+ .mchip:hover{border-color:var(--muted);color:var(--text)}
+ .mchip.sel{border-color:var(--green);color:var(--green);
+      background:rgba(48,209,88,.1);font-weight:600}
+
  footer{border-top:1px solid var(--line2);padding:34px 22px;text-align:center;
        color:var(--muted);font-size:.82rem;line-height:1.8}
 
@@ -264,7 +280,11 @@ var APPI18N = {
      risk:'Risk settings', plow:'Low Risk', pmid:'Balanced', phigh:'High Risk',
      lev:'Leverage (x)', margin:'Margin per trade ($)', sl:'Stop-loss (% of margin)',
      tp:'Take-profit (% of margin)', daily:'Max daily loss (%)', adx:'ADX threshold',
-     symbols:'Symbols (comma separated)', save:'Save settings', savedmsg:'Saved.',
+     symbols:'Markets to trade', save:'Save settings', savedmsg:'Saved.',
+     cat_ALL:'All', cat_CRYPTO:'Crypto', cat_EQUITIES:'Stocks',
+     cat_COMMODITIES:'Commodities', cat_INDICES:'Indices',
+     selectall:'Select visible', clearall:'Clear', selected:'selected',
+     sym_note:'Tip: every selected market is scanned each cycle — more markets, more signals, more open positions at once.',
      bot:'Trading bot', boton:'Bot is running', botoff:'Bot is off',
      start:'Start bot', stop:'Stop bot',
      tg:'Telegram notifications', tglinkbtn:'Link my Telegram', tglinked:'Telegram linked',
@@ -285,7 +305,11 @@ var APPI18N = {
      risk:'Risk ayarları', plow:'Düşük Risk', pmid:'Dengeli', phigh:'Yüksek Risk',
      lev:'Kaldıraç (x)', margin:'İşlem başı teminat ($)', sl:'Stop-loss (teminatın %\\'si)',
      tp:'Take-profit (teminatın %\\'si)', daily:'Günlük azami zarar (%)', adx:'ADX eşiği',
-     symbols:'Semboller (virgülle)', save:'Ayarları kaydet', savedmsg:'Kaydedildi.',
+     symbols:'İşlem açılacak marketler', save:'Ayarları kaydet', savedmsg:'Kaydedildi.',
+     cat_ALL:'Tümü', cat_CRYPTO:'Kripto', cat_EQUITIES:'Hisse',
+     cat_COMMODITIES:'Emtia', cat_INDICES:'Endeks',
+     selectall:'Görünenleri seç', clearall:'Temizle', selected:'seçili',
+     sym_note:'İpucu: seçilen her market her döngüde taranır — market sayısı arttıkça sinyal ve aynı anda açık pozisyon sayısı da artar.',
      bot:'Trade botu', boton:'Bot çalışıyor', botoff:'Bot kapalı',
      start:'Botu başlat', stop:'Botu durdur',
      tg:'Telegram bildirimleri', tglinkbtn:'Telegram\\'ımı bağla', tglinked:'Telegram bağlı',
@@ -515,8 +539,9 @@ function render(){
    fld('sl_pct', t('sl'), s.sl_pct)+fld('tp_pct', t('tp'), s.tp_pct)+
    fld('max_daily_loss_pct', t('daily'), s.max_daily_loss_pct)+
    fld('adx_threshold', t('adx'), s.adx_threshold)+'</div>'+
-   '<div style="margin-top:14px"><label>'+t('symbols')+'</label>'+
-   '<input id="f_symbols" value="'+esc(s.symbols)+'"></div>'+
+   '<div style="margin-top:18px"><label>'+t('symbols')+'</label>'+
+   '<div id="sympick" class="muted">…</div>'+
+   '<p class="muted" style="font-size:.75rem;margin:10px 0 0">'+t('sym_note')+'</p></div>'+
    '<p style="margin:18px 0 0"><button class="pill primary" onclick="saveSettings()">'+
    t('save')+'</button></p><div id="msg"></div>';
   h += card(t('risk'), risk);
@@ -541,7 +566,50 @@ function render(){
  document.getElementById('root').innerHTML = h;
  revealInit();
  setTimeout(loadState, 100);
+ if(ME && ME.settings){
+  SELECTED = (ME.settings.symbols||'').split(',').filter(Boolean);
+  loadMarkets().then(renderSymPick);
+ }
 }
+
+/* --- sembol secici --- */
+var MARKETS = null, SELECTED = [], CURTAB = 'ALL';
+async function loadMarkets(){
+ if(MARKETS) return;
+ try{ MARKETS = (await (await fetch('/api/markets')).json()).markets || []; }
+ catch(e){ MARKETS = []; }
+}
+function renderSymPick(){
+ var el = document.getElementById('sympick');
+ if(!el || !MARKETS) return;
+ var cats = ['ALL','CRYPTO','EQUITIES','COMMODITIES','INDICES'];
+ var tabs = '<div class="symtabs">'+cats.map(function(c){
+  return '<button class="tab'+(CURTAB===c?' act':'')+'" onclick="symTab(\\''+c+'\\')">'+
+   t('cat_'+c)+'</button>';}).join('')+'</div>';
+ var list = MARKETS.filter(function(m){ return CURTAB==='ALL'||m.category===CURTAB; });
+ var chips = '<div class="chips">'+list.map(function(m){
+  return '<button class="mchip'+(SELECTED.indexOf(m.name)>=0?' sel':'')+
+   '" onclick="symToggle(\\''+m.name+'\\')">'+m.name.replace('-USD','')+'</button>';
+ }).join('')+'</div>';
+ var act = '<div style="margin-top:12px">'+
+  '<button class="pill ghost small" onclick="symAll()">'+t('selectall')+'</button> '+
+  '<button class="pill ghost small" onclick="symClear()">'+t('clearall')+'</button>'+
+  '<span class="muted" style="margin-left:10px">'+SELECTED.length+' '+t('selected')+'</span></div>';
+ el.innerHTML = tabs + chips + act;
+ el.classList.remove('muted');
+}
+function symTab(c){ CURTAB = c; renderSymPick(); }
+function symToggle(name){
+ var i = SELECTED.indexOf(name);
+ if(i>=0) SELECTED.splice(i,1); else SELECTED.push(name);
+ renderSymPick();
+}
+function symAll(){
+ MARKETS.filter(function(m){ return CURTAB==='ALL'||m.category===CURTAB; })
+  .forEach(function(m){ if(SELECTED.indexOf(m.name)<0) SELECTED.push(m.name); });
+ renderSymPick();
+}
+function symClear(){ SELECTED = []; renderSymPick(); }
 function fld(id, label, val){
  return '<div><label>'+label+'</label><input id="f_'+id+'" type="number" value="'+esc(val)+'"></div>';
 }
@@ -564,7 +632,7 @@ async function reveal(){
  else alert((await r.json()).error);
 }
 async function saveSettings(){
- var b = {symbols: document.getElementById('f_symbols').value};
+ var b = {symbols: SELECTED.join(',')};
  ['leverage','margin_usd','sl_pct','tp_pct','max_daily_loss_pct','adx_threshold']
   .forEach(function(k){ b[k] = +document.getElementById('f_'+k).value; });
  var r = await fetch('/api/settings', {method:'POST',
@@ -599,9 +667,16 @@ async function pollFund(){
 async function tgLink(){
  var r = await fetch('/api/telegram/link', {method:'POST'});
  var d = await r.json();
- if(d.ok){ window.open(d.url, '_blank');
-  var m=document.getElementById('tgmsg'); if(m) m.textContent=t('tgopen'); pollTg(); }
- else alert(d.error||'?');
+ if(d.ok){
+  // window.open popup engeline takiliyor — tiklanabilir gercek link goster
+  var m = document.getElementById('tgmsg');
+  if(m) m.innerHTML =
+   '<a class="pill primary" style="display:inline-block;margin-top:10px;'+
+   'text-decoration:none" href="'+d.url+'" target="_blank" rel="noopener">'+
+   'Open @arcusTradeBot →</a>'+
+   '<div class="muted" style="margin-top:10px">'+t('tgopen')+'</div>';
+  pollTg();
+ } else alert(d.error||'?');
 }
 async function pollTg(){
  var me = await (await fetch('/api/me')).json();

@@ -241,6 +241,22 @@ def api_account(request: Request):
     return out
 
 
+@app.get("/api/markets")
+def api_markets(request: Request):
+    """Arcus'ta islem goren tum perp marketler (kategori gruplu, sembol secici icin)."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    try:
+        ms = _public_client.markets(refresh=True)
+    except ArcusError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+    out = [{"name": m["marketDisplayName"], "category": m.get("category", "OTHER")}
+           for m in ms if m.get("type") == "PERPETUAL"]
+    out.sort(key=lambda x: (x["category"], x["name"]))
+    return {"markets": out}
+
+
 @app.post("/api/settings")
 async def api_settings(request: Request):
     user = current_user(request)
