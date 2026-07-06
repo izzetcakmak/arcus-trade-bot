@@ -145,6 +145,9 @@ _STYLE = """
  .warn{background:rgba(255,214,10,.08);border:1px solid rgba(255,214,10,.25);
        border-radius:14px;padding:14px 16px;font-size:.85rem;color:var(--amber);
        line-height:1.5}
+ .info{background:rgba(41,151,255,.08);border:1px solid rgba(41,151,255,.25);
+       border-radius:14px;padding:12px 16px;font-size:.82rem;color:#9ecbff;
+       line-height:1.55;margin-top:12px}
  .keybox{background:#101013;border:1px dashed var(--red);border-radius:12px;
        padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:.78rem;
        word-break:break-all;margin:8px 0 16px}
@@ -284,6 +287,7 @@ var APPI18N = {
      cat_ALL:'All', cat_CRYPTO:'Crypto', cat_EQUITIES:'Stocks',
      cat_COMMODITIES:'Commodities', cat_INDICES:'Indices',
      selectall:'Select visible', clearall:'Clear', selected:'selected',
+     eq_note:'ℹ️ Stocks, commodities and indices follow market hours: outside U.S. trading sessions and on weekends liquidity is thin and the market can go OFFLINE — the bot simply won\\'t open new positions there until it reopens. Crypto trades 24/7.',
      sym_note:'Tip: every selected market is scanned each cycle — more markets, more signals, more open positions at once.',
      bot:'Trading bot', boton:'Bot is running', botoff:'Bot is off',
      start:'Start bot', stop:'Stop bot',
@@ -310,6 +314,7 @@ var APPI18N = {
      cat_ALL:'Tümü', cat_CRYPTO:'Kripto', cat_EQUITIES:'Hisse',
      cat_COMMODITIES:'Emtia', cat_INDICES:'Endeks',
      selectall:'Görünenleri seç', clearall:'Temizle', selected:'seçili',
+     eq_note:'ℹ️ Hisse, emtia ve endeksler piyasa saatlerine tabidir: ABD seansı dışında ve hafta sonları likidite incelir, market OFFLINE olabilir — bot o markette piyasa açılana kadar yeni işlem açmaz. Kripto 7/24 işler.',
      sym_note:'İpucu: seçilen her market her döngüde taranır — market sayısı arttıkça sinyal ve aynı anda açık pozisyon sayısı da artar.',
      bot:'Trade botu', boton:'Bot çalışıyor', botoff:'Bot kapalı',
      start:'Botu başlat', stop:'Botu durdur',
@@ -605,7 +610,12 @@ function renderSymPick(){
   '<button class="pill ghost small" onclick="symAll()">'+t('selectall')+'</button> '+
   '<button class="pill ghost small" onclick="symClear()">'+t('clearall')+'</button>'+
   '<span class="muted" style="margin-left:10px">'+SELECTED.length+' '+t('selected')+'</span></div>';
- el.innerHTML = tabs + chips + act;
+ // hisse/emtia/endeks seciliyse piyasa saati bilgilendirmesi goster
+ var hasNonCrypto = SELECTED.some(function(n){
+  return MARKETS.some(function(m){ return m.name===n && m.category!=='CRYPTO'; });
+ });
+ var note = hasNonCrypto ? '<div class="info">'+t('eq_note')+'</div>' : '';
+ el.innerHTML = tabs + chips + act + note;
  el.classList.remove('muted');
 }
 function symTab(c){ CURTAB = c; renderSymPick(); }
