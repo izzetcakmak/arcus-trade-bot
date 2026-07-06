@@ -15,9 +15,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
 
 
+def _clean(v: str) -> str:
+    """Pipe kaynakli gorunmez baytlari temizle (BOM, CR, bosluk)."""
+    return v.replace("﻿", "").replace("\r", "").strip()
+
+
 def _load_or_create_master() -> bytes:
     # 1) ortam degiskeni (Vercel/CI — dosya sistemi salt-okunur olabilir)
-    key = (os.environ.get("WEB_MASTER_KEY") or "").strip()
+    key = _clean(os.environ.get("WEB_MASTER_KEY") or "")
     if key:
         return key.encode()
     # 2) lokal .env; yoksa uret ve yaz
