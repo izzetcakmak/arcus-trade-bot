@@ -274,6 +274,8 @@ async def api_settings(request: Request):
                 return JSONResponse({"error": f"{field}: must be in [{lo}, {hi}]"},
                                     status_code=400)
             changes[field] = int(val) if is_int else val
+    if body.get("lang") in ("en", "tr"):
+        changes["lang"] = body["lang"]
     if "symbols" in body:
         syms = [s.strip().upper() for s in str(body["symbols"]).split(",") if s.strip()]
         if not syms:

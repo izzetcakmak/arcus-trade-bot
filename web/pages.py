@@ -321,7 +321,13 @@ var APPI18N = {
 var lang = localStorage.getItem('lang') || 'en';
 function t(k){ var d = I18N[lang]||I18N.en; if(k in d) return d[k];
                var a = APPI18N[lang]||APPI18N.en; return a[k]||k; }
-function setLang(l){ lang=l; localStorage.setItem('lang', l); render(); }
+function setLang(l){ lang=l; localStorage.setItem('lang', l);
+ // giris yapildiysa dil tercihini sunucuya da yaz (motor olaylari + Telegram bu dilde uretilir)
+ if(typeof ME !== 'undefined' && ME){
+  fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({lang:l})}).catch(function(){});
+ }
+ render(); }
 function langBtns(){ return '<span class="lang">'+
  '<button onclick="setLang(\\'en\\')" class="'+(lang==='en'?'act':'')+'">EN</button>'+
  '<button onclick="setLang(\\'tr\\')" class="'+(lang==='tr'?'act':'')+'">TR</button></span>'; }

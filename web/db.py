@@ -162,6 +162,12 @@ def init():
             c.exec(schema)
         else:
             c.c.executescript(schema)
+    # gec eklenen kolonlar (mevcut kurulumlar icin migration)
+    try:
+        with _Conn() as c:
+            c.exec("ALTER TABLE settings ADD COLUMN lang TEXT DEFAULT 'en'")
+    except Exception:
+        pass  # kolon zaten var
 
 
 def get_or_create_user(email: str, name: str = "", google_sub: str = "") -> dict:
@@ -217,7 +223,7 @@ def get_settings(user_id: int) -> dict | None:
 
 _SETTINGS_COLS = {"bot_active", "symbols", "leverage", "margin_usd", "sl_pct",
                   "tp_pct", "max_daily_loss_pct", "adx_threshold",
-                  "telegram_chat_id", "telegram_link_token"}
+                  "telegram_chat_id", "telegram_link_token", "lang"}
 
 
 def update_settings(user_id: int, **kw):

@@ -20,6 +20,73 @@ from config import Config
 IOC_FACTORS = (0.998, 0.99, 0.97)   # satista carpan; alista 2-x uygulanir
 REPRICE_SEC = 60                     # dinlenen cikis emrini yeniden fiyatlama araligi
 
+# Bildirim kataloglari — engine.lang ("tr"/"en") secer. Standalone bot: tr.
+MESSAGES = {
+    "market_not_found":    {"tr": "Market bulunamadi, atlandi: {sym}",
+                            "en": "Market not found, skipped: {sym}"},
+    "leverage_failed":     {"tr": "{sym} kaldirac ayarlanamadi (devam): {err}",
+                            "en": "{sym}: could not set leverage (continuing): {err}"},
+    "engine_ready":        {"tr": "Motor hazir ({base})\nSemboller: {syms} | TF: {tf} | Kaldirac: {lev}x\nIslem basi teminat: {margin:.0f} USD | SL/TP: teminatin %{sl:.0f}/%{tp:.0f}\nEquity: {eq:.2f} USD",
+                            "en": "Engine ready ({base})\nMarkets: {syms} | TF: {tf} | Leverage: {lev}x\nMargin per trade: ${margin:.0f} | SL/TP: {sl:.0f}%/{tp:.0f}% of margin\nEquity: ${eq:.2f}"},
+    "cfg_unknown_market":  {"tr": "Ayar: bilinmeyen market atlandi: {sym}",
+                            "en": "Settings: unknown market skipped: {sym}"},
+    "cfg_updated":         {"tr": "AYARLAR GUNCELLENDI (panelden): {changes}",
+                            "en": "SETTINGS UPDATED (from dashboard): {changes}"},
+    "equity_read_failed":  {"tr": "Equity okunamadi: {err}",
+                            "en": "Could not read equity: {err}"},
+    "daily_halt":          {"tr": "GUNLUK ZARAR LIMITI asildi (%{pct:.1f}). Bugun yeni islem yok; yarin otomatik reset.",
+                            "en": "DAILY LOSS LIMIT reached ({pct:.1f}%). No new trades today; resets tomorrow."},
+    "tick_error":          {"tr": "{sym} tick hatasi: {err}",
+                            "en": "{sym} tick error: {err}"},
+    "unexpected_error":    {"tr": "{sym} beklenmeyen hata: {err}",
+                            "en": "{sym} unexpected error: {err}"},
+    "external_position":   {"tr": "{sym}: takip edilmeyen acik pozisyon var; otomatik islem yapilmadi.",
+                            "en": "{sym}: untracked open position detected; automatic trading skipped for it."},
+    "insufficient_equity": {"tr": "{sym}: yetersiz equity ({need:.0f} > {have:.2f}). Atlandi.",
+                            "en": "{sym}: insufficient equity ({need:.0f} > {have:.2f}). Skipped."},
+    "trade_too_small":     {"tr": "{sym}: islem cok kucuk (qty={qty}, notional={notional:.2f}).",
+                            "en": "{sym}: trade too small (qty={qty}, notional={notional:.2f})."},
+    "entry_not_filled":    {"tr": "{sym}: giris IOC dolmadi ({status}/{reason}) — kitap bos olabilir, sinyal atlandi.",
+                            "en": "{sym}: entry IOC did not fill ({status}/{reason}) — book may be empty, signal skipped."},
+    "tpsl_unsupported":    {"tr": "Not: borsa TPSL emri kabul etmedi (testnette henuz yok) — SL/TP bot tarafinda mark fiyatiyla izlenecek.",
+                            "en": "Note: exchange rejected TPSL orders (not yet live on testnet) — SL/TP will be monitored bot-side via mark price."},
+    "position_opened":     {"tr": "YENI POZISYON: {sym} {side}\nSebep: {reason}\nTeminat: {margin:.0f} USD x{lev} | Giris~{mark:.6g} | Miktar: {qty}\nSL: {sl:.6g} | TP: {tp:.6g} ({where})",
+                            "en": "NEW POSITION: {sym} {side}\nReason: {reason}\nMargin: ${margin:.0f} x{lev} | Entry~{mark:.6g} | Size: {qty}\nSL: {sl:.6g} | TP: {tp:.6g} ({where})"},
+    "tpsl_where_server":   {"tr": "borsada", "en": "on exchange"},
+    "tpsl_where_bot":      {"tr": "bot izliyor", "en": "bot-monitored"},
+    "close_started":       {"tr": "{sym}: {reason} — IOC dolmadi (likidite yok), dinlenen cikis emri kitapta, dolana kadar yeniden fiyatlanir.",
+                            "en": "{sym}: {reason} — IOC did not fill (no liquidity); resting exit order on the book, repriced until filled."},
+    "ioc_close_error":     {"tr": "{sym} IOC kapatma hatasi: {err}",
+                            "en": "{sym} IOC close error: {err}"},
+    "resting_exit_failed": {"tr": "{sym} dinlenen cikis emri konulamadi: {err} — sonraki tick'te yeniden denenecek.",
+                            "en": "{sym}: could not place resting exit order: {err} — retrying next tick."},
+    "position_closed":     {"tr": "POZISYON KAPANDI: {sym} ({reason})\nYaklasik PnL: {pnl:+.2f} USD | Toplam: {total:+.2f} | Islem: {trades} (W:{wins})",
+                            "en": "POSITION CLOSED: {sym} ({reason})\nApprox PnL: {pnl:+.2f} USD | Total: {total:+.2f} | Trades: {trades} (W:{wins})"},
+    "reverse_signal":      {"tr": "Ters sinyal geldi", "en": "Reverse signal"},
+    "sl_hit":              {"tr": "SL tetiklendi (bot-tarafi, mark {mark:.6g})",
+                            "en": "Stop-loss hit (bot-side, mark {mark:.6g})"},
+    "tp_hit":              {"tr": "TP tetiklendi (bot-tarafi, mark {mark:.6g})",
+                            "en": "Take-profit hit (bot-side, mark {mark:.6g})"},
+    "sl_tp_default":       {"tr": "SL/TP tetiklendi", "en": "SL/TP triggered"},
+    "reason_long":         {"tr": "EMA9>EMA21 kesisim + fiyat EMA200 ustu + ADX guclu + MACD+",
+                            "en": "EMA9>EMA21 cross + price above EMA200 + strong ADX + MACD+"},
+    "reason_short":        {"tr": "EMA9<EMA21 kesisim + fiyat EMA200 alti + ADX guclu + MACD-",
+                            "en": "EMA9<EMA21 cross + price below EMA200 + strong ADX + MACD-"},
+    "no_signal":           {"tr": "Sinyal yok (ADX={adx:.0f}, RSI={rsi:.0f})",
+                            "en": "No signal (ADX={adx:.0f}, RSI={rsi:.0f})"},
+    "price_lbl":           {"tr": "fiyat", "en": "price"},
+}
+
+# apply_config degisiklik etiketleri (alan -> (tr, en))
+_CHANGE_LABELS = {
+    "leverage": ("kaldirac", "leverage"),
+    "margin_usd": ("teminat", "margin"),
+    "sl_pct": ("SL%", "SL%"),
+    "tp_pct": ("TP%", "TP%"),
+    "max_daily_loss_pct": ("gunluk limit%", "daily limit%"),
+    "adx_threshold": ("ADX", "ADX"),
+}
+
 
 @dataclass
 class Position:
@@ -56,7 +123,12 @@ class TradingEngine:
         self.wins = 0
         self.total_pnl = 0.0
         self.last_signal: dict[str, str] = {}      # sym -> son degerlendirme ozeti
+        self.lang = "tr"                           # bildirim dili (multiengine gecersiz kilar)
         self._tick_markets: dict[str, dict] = {}   # tick basina taze market verisi
+
+    def _msg(self, key: str, **kw) -> str:
+        tpl = MESSAGES[key]
+        return tpl.get(self.lang, tpl["en"]).format(**kw)
 
     # ---------- kurulum ----------
     def setup(self):
@@ -65,13 +137,13 @@ class TradingEngine:
             try:
                 self.client.market(sym)
             except KeyError:
-                self.notify(f"Market bulunamadi, atlandi: {sym}")
+                self.notify(self._msg("market_not_found", sym=sym))
                 continue
             valid.append(sym)
             try:
                 self.client.set_leverage(sym, self.cfg.leverage)
             except ArcusError as e:
-                self.notify(f"{sym} kaldirac ayarlanamadi (devam): {e}")
+                self.notify(self._msg("leverage_failed", sym=sym, err=e))
         if not valid:
             raise SystemExit("Gecerli sembol yok.")
         self.cfg.symbols = valid
@@ -84,12 +156,10 @@ class TradingEngine:
                                  "web app 'Testnet Deposit'.") from None
             raise
         self.day_start_equity = eq
-        self.notify(f"Motor hazir ({self.cfg.base})\n"
-                    f"Semboller: {', '.join(valid)} | TF: {self.cfg.timeframe} | "
-                    f"Kaldirac: {self.cfg.leverage}x\n"
-                    f"Islem basi teminat: {self.cfg.margin_usd:.0f} USD | "
-                    f"SL/TP: teminatin %{self.cfg.sl_pct:.0f}/%{self.cfg.tp_pct:.0f}\n"
-                    f"Equity: {eq:.2f} USD")
+        self.notify(self._msg("engine_ready", base=self.cfg.base,
+                              syms=", ".join(valid), tf=self.cfg.timeframe,
+                              lev=self.cfg.leverage, margin=self.cfg.margin_usd,
+                              sl=self.cfg.sl_pct, tp=self.cfg.tp_pct, eq=eq))
 
     # ---------- ayar sicak-yenileme ----------
     def apply_config(self, new_cfg: Config):
@@ -102,29 +172,30 @@ class TradingEngine:
                 self.client.market(sym)
                 valid.append(sym)
             except KeyError:
-                self.notify(f"Ayar: bilinmeyen market atlandi: {sym}")
+                self.notify(self._msg("cfg_unknown_market", sym=sym))
         new_cfg.symbols = valid or old.symbols
 
-        changes = []
-        for alan, ad in (("leverage", "kaldirac"), ("margin_usd", "teminat"),
-                         ("sl_pct", "SL%"), ("tp_pct", "TP%"),
-                         ("max_daily_loss_pct", "gunluk limit%"),
-                         ("adx_threshold", "ADX")):
+        li = 0 if self.lang == "tr" else 1
+        changes, leverage_changed = [], False
+        for alan, labels in _CHANGE_LABELS.items():
             if getattr(new_cfg, alan) != getattr(old, alan):
-                changes.append(f"{ad} {getattr(old, alan)} -> {getattr(new_cfg, alan)}")
+                if alan == "leverage":
+                    leverage_changed = True
+                changes.append(f"{labels[li]} {getattr(old, alan)} -> "
+                               f"{getattr(new_cfg, alan)}")
         if set(new_cfg.symbols) != set(old.symbols):
-            changes.append(f"semboller: {', '.join(new_cfg.symbols)}")
+            lbl = "semboller" if self.lang == "tr" else "markets"
+            changes.append(f"{lbl}: {', '.join(new_cfg.symbols)}")
 
         self.cfg = new_cfg
-        if any(c.startswith("kaldirac") for c in changes) or \
-           set(new_cfg.symbols) - set(old.symbols):
+        if leverage_changed or set(new_cfg.symbols) - set(old.symbols):
             for sym in new_cfg.symbols:
                 try:
                     self.client.set_leverage(sym, new_cfg.leverage)
                 except ArcusError as e:
-                    self.notify(f"{sym} kaldirac ayarlanamadi: {e}")
+                    self.notify(self._msg("leverage_failed", sym=sym, err=e))
         if changes:
-            self.notify("AYARLAR GUNCELLENDI (panelden): " + " | ".join(changes))
+            self.notify(self._msg("cfg_updated", changes=" | ".join(changes)))
 
     # ---------- yardimcilar ----------
     def _equity(self) -> float:
@@ -175,23 +246,23 @@ class TradingEngine:
         try:
             eq = self._equity()
         except ArcusError as e:
-            self.notify(f"Equity okunamadi: {e}")
+            self.notify(self._msg("equity_read_failed", err=e))
             return
         self._roll_day(eq)
         if not self.halted_today and self.day_start_equity > 0:
             loss_pct = (self.day_start_equity - eq) / self.day_start_equity * 100
             if loss_pct >= self.cfg.max_daily_loss_pct:
                 self.halted_today = True
-                self.notify(f"GUNLUK ZARAR LIMITI asildi (%{loss_pct:.1f}). "
-                            f"Bugun yeni islem yok; yarin otomatik reset.")
+                self.notify(self._msg("daily_halt", pct=loss_pct))
         # izlenen semboller + (listeden cikarilmis olsa da) acik pozisyonlular
         for sym in dict.fromkeys(list(self.cfg.symbols) + list(self.positions)):
             try:
                 self._tick_symbol(sym)
             except ArcusError as e:
-                self.notify(f"{sym} tick hatasi: {e}")
+                self.notify(self._msg("tick_error", sym=sym, err=e))
             except Exception as e:  # tek sembol hatasi donguyu oldurmesin
-                self.notify(f"{sym} beklenmeyen hata: {type(e).__name__}: {e}")
+                self.notify(self._msg("unexpected_error", sym=sym,
+                                      err=f"{type(e).__name__}: {e}"))
 
     def _tick_symbol(self, sym):
         size = self._position_size(sym)
@@ -215,14 +286,14 @@ class TradingEngine:
             hit = None
             if tracked.side == "long":
                 if mark <= tracked.sl:
-                    hit = f"SL tetiklendi (bot-tarafi, mark {mark:.6g})"
+                    hit = self._msg("sl_hit", mark=mark)
                 elif mark >= tracked.tp:
-                    hit = f"TP tetiklendi (bot-tarafi, mark {mark:.6g})"
+                    hit = self._msg("tp_hit", mark=mark)
             else:
                 if mark >= tracked.sl:
-                    hit = f"SL tetiklendi (bot-tarafi, mark {mark:.6g})"
+                    hit = self._msg("sl_hit", mark=mark)
                 elif mark <= tracked.tp:
-                    hit = f"TP tetiklendi (bot-tarafi, mark {mark:.6g})"
+                    hit = self._msg("tp_hit", mark=mark)
             if hit:
                 self._begin_close(sym, tracked, hit)
                 return
@@ -238,15 +309,16 @@ class TradingEngine:
 
         df = strategy.build_frame(rows)
         sig = strategy.evaluate(df, self.cfg.adx_threshold)
+        state = (sig.side.upper() if sig.side
+                 else self._msg("no_signal", adx=sig.adx, rsi=sig.rsi))
         self.last_signal[sym] = (f"{dt.datetime.now().strftime('%H:%M')} | "
-                                 f"fiyat {sig.price:.6g} | "
-                                 f"{sig.side.upper() if sig.side else sig.reason}")
+                                 f"{self._msg('price_lbl')} {sig.price:.6g} | {state}")
 
         if tracked:
             opp = (tracked.side == "long" and sig.side == "short") or \
                   (tracked.side == "short" and sig.side == "long")
             if opp:
-                self._begin_close(sym, tracked, "Ters sinyal geldi")
+                self._begin_close(sym, tracked, self._msg("reverse_signal"))
             return
 
         if self.halted_today or not self.entries_enabled:
@@ -254,8 +326,7 @@ class TradingEngine:
         if size != 0:
             if sym not in self.warned_external:
                 self.warned_external.add(sym)
-                self.notify(f"{sym}: takip edilmeyen acik pozisyon var; "
-                            f"otomatik islem yapilmadi.")
+                self.notify(self._msg("external_position", sym=sym))
             return
         if sig.side:
             self._open(sym, sig)
@@ -271,13 +342,14 @@ class TradingEngine:
 
         eq = self._equity()
         if margin > eq:
-            self.notify(f"{sym}: yetersiz equity ({margin:.0f} > {eq:.2f}). Atlandi.")
+            self.notify(self._msg("insufficient_equity", sym=sym, need=margin, have=eq))
             return
 
         qty = self.client.snap_quantity(m, (margin * lev) / mark)
         notional = float(qty) * mark
         if float(qty) <= 0 or notional < float(m.get("minOrderNotional", 0)):
-            self.notify(f"{sym}: islem cok kucuk (qty={qty}, notional={notional:.2f}).")
+            self.notify(self._msg("trade_too_small", sym=sym, qty=qty,
+                                  notional=notional))
             return
 
         long = sig.side == "long"
@@ -288,9 +360,9 @@ class TradingEngine:
                                     order_type="MARKET", tif="IOC")
         filled = Decimal(r.get("filledSize", "0") or "0")
         if r.get("status") != "FILLED" or filled <= 0:
-            self.notify(f"{sym}: giris IOC dolmadi "
-                        f"({r.get('status')}/{r.get('rejectionReason', '?')}) — "
-                        f"kitap bos olabilir, sinyal atlandi.")
+            self.notify(self._msg("entry_not_filled", sym=sym,
+                                  status=r.get("status"),
+                                  reason=r.get("rejectionReason", "?")))
             return
         qty_s = dec_str(filled)
 
@@ -318,19 +390,17 @@ class TradingEngine:
         except ArcusError:
             if not self.warned_tpsl_unsupported:
                 self.warned_tpsl_unsupported = True
-                self.notify("Not: borsa TPSL emri kabul etmedi (testnette henuz yok) — "
-                            "SL/TP bot tarafinda mark fiyatiyla izlenecek.")
+                self.notify(self._msg("tpsl_unsupported"))
 
         self.positions[sym] = pos
         self.trades += 1
         panel = f"\nPanel: {self.cfg.dashboard_url}" if self.cfg.dashboard_url else ""
-        self.notify(f"YENI POZISYON: {sym} {'LONG' if long else 'SHORT'}\n"
-                    f"Sebep: {sig.reason}\n"
-                    f"Teminat: {margin:.0f} USD x{lev} | Giris~{mark:.6g} | "
-                    f"Miktar: {qty_s}\n"
-                    f"SL: {sl:.6g} | TP: {tp:.6g} "
-                    f"({'borsada' if pos.server_tpsl else 'bot izliyor'})"
-                    f"{panel}")
+        reason = self._msg("reason_long" if long else "reason_short")
+        where = self._msg("tpsl_where_server" if pos.server_tpsl else "tpsl_where_bot")
+        self.notify(self._msg("position_opened", sym=sym,
+                              side="LONG" if long else "SHORT", reason=reason,
+                              margin=margin, lev=lev, mark=mark, qty=qty_s,
+                              sl=sl, tp=tp, where=where) + panel)
 
     # ---------- kapanis surecleri ----------
     def _begin_close(self, sym, pos: Position, reason: str):
@@ -344,8 +414,7 @@ class TradingEngine:
         if self._try_ioc_close(sym, pos):
             return
         self._place_resting_exit(sym, pos)
-        self.notify(f"{sym}: {reason} — IOC dolmadi (likidite yok), "
-                    f"dinlenen cikis emri kitapta, dolana kadar yeniden fiyatlanir.")
+        self.notify(self._msg("close_started", sym=sym, reason=reason))
 
     def _try_ioc_close(self, sym, pos: Position) -> bool:
         m = self._fresh_market(sym)
@@ -359,7 +428,7 @@ class TradingEngine:
                                             order_type="LIMIT", tif="IOC",
                                             reduce_only=True)
             except ArcusError as e:
-                self.notify(f"{sym} IOC kapatma hatasi: {e}")
+                self.notify(self._msg("ioc_close_error", sym=sym, err=e))
                 return False
             if r.get("status") == "FILLED":
                 self._on_closed(sym)
@@ -378,8 +447,7 @@ class TradingEngine:
             pos.exit_order_id = r.get("orderId")
             pos.exit_placed_ts = time.time()
         except ArcusError as e:
-            self.notify(f"{sym} dinlenen cikis emri konulamadi: {e} — "
-                        f"sonraki tick'te yeniden denenecek.")
+            self.notify(self._msg("resting_exit_failed", sym=sym, err=e))
             pos.exit_order_id = None
 
     def _manage_exit(self, sym, pos: Position):
@@ -420,10 +488,10 @@ class TradingEngine:
         self.total_pnl += pnl
         if pnl >= 0:
             self.wins += 1
-        self.notify(f"POZISYON KAPANDI: {sym} "
-                    f"({reason or pos.close_reason or 'SL/TP tetiklendi'})\n"
-                    f"Yaklasik PnL: {pnl:+.2f} USD | Toplam: {self.total_pnl:+.2f} | "
-                    f"Islem: {self.trades} (W:{self.wins})")
+        self.notify(self._msg(
+            "position_closed", sym=sym,
+            reason=reason or pos.close_reason or self._msg("sl_tp_default"),
+            pnl=pnl, total=self.total_pnl, trades=self.trades, wins=self.wins))
         self.warned_external.discard(sym)
 
     # ---------- durum ----------

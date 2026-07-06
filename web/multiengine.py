@@ -33,7 +33,8 @@ _started = False
 
 def _sig(row) -> tuple:
     return (row["symbols"], row["leverage"], row["margin_usd"], row["sl_pct"],
-            row["tp_pct"], row["max_daily_loss_pct"], row["adx_threshold"])
+            row["tp_pct"], row["max_daily_loss_pct"], row["adx_threshold"],
+            row.get("lang") or "en")
 
 
 def _make_cfg(row) -> Config:
@@ -63,6 +64,7 @@ def _make_runner(row) -> dict:
             notifier.send(chat, msg)
 
     eng = TradingEngine(_make_cfg(row), notify)
+    eng.lang = row.get("lang") or "en"
     return {"engine": eng, "events": events, "sig": _sig(row), "setup_done": False}
 
 
@@ -92,6 +94,7 @@ def _loop():
                             continue
                     if r["sig"] != _sig(row):
                         try:
+                            eng.lang = row.get("lang") or "en"
                             eng.apply_config(_make_cfg(row))
                             r["sig"] = _sig(row)
                         except Exception as e:
