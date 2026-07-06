@@ -11,8 +11,10 @@ from dotenv import dotenv_values
 from web import db
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOKEN = (dotenv_values(os.path.join(BASE_DIR, ".env"))
-         .get("WEB_TELEGRAM_BOT_TOKEN") or "").strip()
+TOKEN = (os.environ.get("WEB_TELEGRAM_BOT_TOKEN")          # Vercel: ortam degiskeni
+         or dotenv_values(os.path.join(BASE_DIR, ".env"))  # lokal: .env
+         .get("WEB_TELEGRAM_BOT_TOKEN") or "")
+TOKEN = TOKEN.replace("﻿", "").replace("\r", "").strip()
 API = f"https://api.telegram.org/bot{TOKEN}"
 
 _username = None
