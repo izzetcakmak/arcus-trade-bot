@@ -23,7 +23,7 @@ from web import db, security
 from web import notifier
 
 ARCUS_BASE = (dotenv_values(os.path.join(BASE_DIR, ".env"))
-              .get("ARCUS_BASE", "https://api.testnet.arcus.xyz"))
+              .get("WEB_ARCUS_BASE", "https://api.testnet.arcus.xyz"))
 TICK_SEC = 30
 
 _runners: dict[int, dict] = {}    # user_id -> {engine, events, sig, chat_id}

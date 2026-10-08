@@ -35,7 +35,9 @@ def _env(key, default=""):
     # PowerShell/Windows pipe'lari BOM sokabiliyor — gorunmez baytlari temizle
     return val.replace("﻿", "").strip()
 
-ARCUS_BASE = _env("ARCUS_BASE", "https://api.testnet.arcus.xyz")
+# Web urunu testnet'e sabit: kisisel botun ARCUS_BASE'i mainnet'e gecse bile
+# cok-kullanicili motor/fonlama testnet'te kalir (WEB_ARCUS_BASE ile ezilebilir).
+ARCUS_BASE = _env("WEB_ARCUS_BASE", "https://api.testnet.arcus.xyz")
 GOOGLE_CLIENT_ID = _env("GOOGLE_CLIENT_ID").strip()
 MAX_FUND_USD = 25_000
 
