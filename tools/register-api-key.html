@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcus API Key Register</title>
+<style>
+ body{background:#0d1117;color:#e6edf3;font:15px/1.6 system-ui,sans-serif;
+      max-width:720px;margin:40px auto;padding:0 16px}
+ h1{font-size:1.2rem}
+ .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:16px;margin:14px 0}
+ .muted{color:#8b949e;font-size:.85rem}
+ pre{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px;
+     white-space:pre-wrap;word-break:break-all;font-size:.78rem}
+ .btn{background:#238636;color:#fff;border:0;border-radius:8px;padding:10px 18px;
+      font-size:1rem;cursor:pointer}
+ .btn:disabled{background:#30363d;cursor:default}
+ .ok{color:#3fb950;font-weight:600}.err{color:#f85149;font-weight:600}.warn{color:#d29922;font-weight:600}
+ td{padding:2px 8px 2px 0;vertical-align:top}
+ .mono{font-family:ui-monospace,monospace;font-size:.8rem;word-break:break-all}
+</style>
+</head>
+<body>
+<h1>Arcus API Key Register</h1>
+<p class="muted">Registers an Ed25519 public key for your wallet via
+<code>POST /v1/createApiKey</code>. Your wallet only produces a
+<code>personal_sign</code> signature of the message shown below — no
+transaction, no gas, no fund movement. The private signing key never leaves
+your <code>.env</code>; this page only handles the public half.</p>
+
+<div class="card">
+ <table>
+  <tr><td>API base</td><td class="mono" id="v_base"></td></tr>
+  <tr><td>Wallet (expected)</td><td class="mono" id="v_addr"></td></tr>
+  <tr><td>Public key</td><td class="mono" id="v_pub"></td></tr>
+  <tr><td>Key name</td><td class="mono" id="v_name"></td></tr>
+  <tr><td>Valid until</td><td class="mono" id="v_until"></td></tr>
+ </table>
+ <p class="muted" style="margin-bottom:4px">Exact message your wallet will sign:</p>
+ <pre id="msg"></pre>
+</div>
+
+<button class="btn" id="go">Connect wallet, sign &amp; register</button>
+<div class="card" id="out" style="display:none"></div>
+
+<script>
+var q = new URLSearchParams(location.search);
+var BASE  = q.get('base')  || 'https://api.arcus.xyz';
+var ADDR  = (q.get('address') || '').trim();
+var PUB   = (q.get('pub') || '').trim().toLowerCase().replace(/^0x/,'');
+var NAME  = q.get('name')  || 'arcus-trade-bot';
+var UNTIL = parseInt(q.get('until') || (Date.now() + 365*86400*1000), 10);
+// Canonical message: exact key order, no whitespace (gateway rebuilds & ecrecovers).
+var MESSAGE = '{"apiWalletName":"' + NAME + '","apiWalletPublicKey":"' + PUB +
+              '","validUntil":' + UNTIL + '}';
+
+document.getElementById('v_base').textContent  = BASE;
+document.getElementById('v_addr').textContent  = ADDR || '(connect wallet)';
+document.getElementById('v_pub').textContent   = PUB || '(missing ?pub= param!)';
+document.getElementById('v_name').textContent  = NAME;
+document.getElementById('v_until').textContent = UNTIL + ' (' + new Date(UNTIL).toISOString() + ')';
+document.getElementById('msg').textContent     = MESSAGE;
+
+function show(html){ var o=document.getElementById('out'); o.style.display='block'; o.innerHTML += html; }
+
+document.getElementById('go').onclick = async function(){
+ var btn = this; btn.disabled = true;
+ document.getElementById('out').innerHTML = '';
+ try{
+  if(!window.ethereum) throw new Error('No wallet found — open this page in the browser where MetaMask is installed.');
+  if(!/^[0-9a-f]{64}$/.test(PUB)) throw new Error('pub param must be 64 hex chars.');
+  var accs = await ethereum.request({method:'eth_requestAccounts'});
+  var acct = accs[0];
+  show('<div>Connected: <span class="mono">' + acct + '</span></div>');
+  if(ADDR && acct.toLowerCase() !== ADDR.toLowerCase()){
+   show('<div class="warn">WARNING: connected account differs from the expected wallet. ' +
+        'Switch MetaMask to the expected account and click again.</div>');
+   btn.disabled = false; return;
+  }
+  var hexMsg = '0x' + Array.from(new TextEncoder().encode(MESSAGE))
+                           .map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+  var sig = await ethereum.request({method:'personal_sign', params:[hexMsg, acct]});
+  show('<div>Signature: <span class="mono">' + sig + '</span></div>');
+  var r = '0x' + sig.slice(2,66), s = '0x' + sig.slice(66,130);
+  var v = parseInt(sig.slice(130,132),16); if(v < 27) v += 27;
+  var body = {address: acct, publicKey: PUB, apiWalletName: NAME,
+              validUntil: UNTIL, signature: {r:r, s:s, v:'0x'+v.toString(16)}};
+  var resp = await fetch(BASE + '/v1/createApiKey',
+    {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  var text = await resp.text();
+  show('<div>createApiKey → HTTP ' + resp.status + '</div><pre>' + text + '</pre>');
+  if(!resp.ok){ show('<div class="err">Registration failed — see response above.</div>');
+                btn.disabled = false; return; }
+  // verify: key must now appear in the address's key list
+  var list = await (await fetch(BASE + '/v1/apiKeys?address=' + acct)).json();
+  var found = (list.apiKeys||[]).some(function(k){return k.apiKey === PUB;});
+  show(found ? '<div class="ok">VERIFIED: key is now registered for this wallet. ' +
+               'You can close this page — the bot can sign orders.</div>'
+             : '<div class="warn">Registered but not yet visible in the key list — tell Claude to re-check.</div>');
+ }catch(e){ show('<div class="err">' + (e && e.message ? e.message : e) + '</div>'); btn.disabled = false; }
+};
+</script>
+</body>
+</html>
