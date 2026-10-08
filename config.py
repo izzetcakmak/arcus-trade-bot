@@ -46,7 +46,10 @@ class Config:
         cfg = cls(
             base=os.getenv("ARCUS_BASE", "https://api.testnet.arcus.xyz").strip(),
             address=os.getenv("WALLET_ADDRESS", "").strip(),
-            api_privkey=os.getenv("ARCUS_API_PRIVKEY", "").strip(),
+            # Mainnet anahtari API_SIGNING_KEY adiyla kaydedildi; eski testnet
+            # anahtari ARCUS_API_PRIVKEY yedek olarak durur.
+            api_privkey=(os.getenv("API_SIGNING_KEY")
+                         or os.getenv("ARCUS_API_PRIVKEY") or "").strip(),
             account_index=_i("ARCUS_ACCOUNT_INDEX", 0),
             symbols=symbols,
             timeframe=os.getenv("TIMEFRAME", "15m").strip(),
@@ -63,7 +66,7 @@ class Config:
                                     "http://192.168.1.100:8377").strip(),
         )
         missing = [k for k, v in (("WALLET_ADDRESS", cfg.address),
-                                  ("ARCUS_API_PRIVKEY", cfg.api_privkey)) if not v]
+                                  ("API_SIGNING_KEY", cfg.api_privkey)) if not v]
         if missing:
             raise SystemExit("Eksik ayar: " + ", ".join(missing) +
                              " — once 'python onboard.py' calistir.")

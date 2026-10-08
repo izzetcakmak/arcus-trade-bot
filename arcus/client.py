@@ -1,4 +1,4 @@
-"""Arcus exchange REST istemcisi (testnet oncelikli).
+"""Arcus exchange REST istemcisi (base URL ile testnet/mainnet secilir).
 
 Imzalama kurallari: https://docs.arcus.xyz/api-reference/authentication
 - Sema 1 (placeOrder/cancelOrder/modifyOrder/batch*): imzalanan mesaj, compact ve
@@ -19,6 +19,7 @@ from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 TESTNET_BASE = "https://api.testnet.arcus.xyz"
+MAINNET_BASE = "https://api.arcus.xyz"
 
 SIDE = {"BUY": 0, "SELL": 1}
 TIF = {"GTT": 0, "FOK": 1, "IOC": 2, "ALO": 3}

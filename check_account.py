@@ -9,14 +9,16 @@ from arcus.client import ArcusClient, ArcusError
 env = dotenv_values(".env")
 client = ArcusClient(base=env["ARCUS_BASE"], address=env["WALLET_ADDRESS"],
                      account_index=env.get("ARCUS_ACCOUNT_INDEX", 0),
-                     api_privkey_hex=env["ARCUS_API_PRIVKEY"])
+                     api_privkey_hex=(env.get("API_SIGNING_KEY")
+                                      or env.get("ARCUS_API_PRIVKEY")))
 
 try:
     acct = client.account()
     print("hesap:", json.dumps(acct, indent=2)[:800])
 except ArcusError as e:
     if e.status == 404:
-        print("Hesapta henuz aktivite yok — once fonla (fund_testnet.py veya web app).")
+        print("Hesapta henuz aktivite yok — once fonla "
+              "(testnet: fund_testnet.py, mainnet: arcus.xyz Deposit).")
     else:
         raise
 else:

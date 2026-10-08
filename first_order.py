@@ -11,7 +11,8 @@ from arcus.client import ArcusClient
 env = dotenv_values(".env")
 client = ArcusClient(base=env["ARCUS_BASE"], address=env["WALLET_ADDRESS"],
                      account_index=env.get("ARCUS_ACCOUNT_INDEX", 0),
-                     api_privkey_hex=env["ARCUS_API_PRIVKEY"])
+                     api_privkey_hex=(env.get("API_SIGNING_KEY")
+                                      or env.get("ARCUS_API_PRIVKEY")))
 
 m = client.market("BTC-USD")
 price = client.snap_price(m, float(m["oraclePrice"]) * 0.95)
