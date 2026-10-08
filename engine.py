@@ -48,8 +48,8 @@ MESSAGES = {
                             "en": "{sym}: trade too small (qty={qty}, notional={notional:.2f})."},
     "entry_not_filled":    {"tr": "{sym}: giris IOC dolmadi ({status}/{reason}) — kitap bos olabilir, sinyal atlandi.",
                             "en": "{sym}: entry IOC did not fill ({status}/{reason}) — book may be empty, signal skipped."},
-    "tpsl_unsupported":    {"tr": "Not: borsa TPSL emri kabul etmedi (testnette henuz yok) — SL/TP bot tarafinda mark fiyatiyla izlenecek.",
-                            "en": "Note: exchange rejected TPSL orders (not yet live on testnet) — SL/TP will be monitored bot-side via mark price."},
+    "tpsl_unsupported":    {"tr": "Not: borsa TPSL emri kabul etmedi — SL/TP bot tarafinda mark fiyatiyla izlenecek.",
+                            "en": "Note: exchange rejected TPSL orders — SL/TP will be monitored bot-side via mark price."},
     "position_opened":     {"tr": "YENI POZISYON: {sym} {side}\nSebep: {reason}\nTeminat: {margin:.0f} USD x{lev} | Giris~{mark:.6g} | Miktar: {qty}\nSL: {sl:.6g} | TP: {tp:.6g} ({where})",
                             "en": "NEW POSITION: {sym} {side}\nReason: {reason}\nMargin: ${margin:.0f} x{lev} | Entry~{mark:.6g} | Size: {qty}\nSL: {sl:.6g} | TP: {tp:.6g} ({where})"},
     "tpsl_where_server":   {"tr": "borsada", "en": "on exchange"},
@@ -152,8 +152,8 @@ class TradingEngine:
             eq = self._equity()
         except ArcusError as e:
             if e.status == 404:
-                raise SystemExit("Hesap fonlanmamis — once fund_testnet.py veya "
-                                 "web app 'Testnet Deposit'.") from None
+                raise SystemExit("Hesap fonlanmamis — testnette fund_testnet.py, "
+                                 "mainnette arcus.xyz'den Deposit.") from None
             raise
         self.day_start_equity = eq
         self.notify(self._msg("engine_ready", base=self.cfg.base,

@@ -23,10 +23,13 @@ ENV_PATH = os.path.join(BASE_DIR, ".env")
 PORT = 8377
 
 env0 = dotenv_values(ENV_PATH)
-client = ArcusClient(base=env0.get("ARCUS_BASE", "https://api.testnet.arcus.xyz"),
+BASE0 = env0.get("ARCUS_BASE", "https://api.testnet.arcus.xyz")
+NET_LABEL = "testnet" if "testnet" in BASE0 else "mainnet"
+client = ArcusClient(base=BASE0,
                      address=env0.get("WALLET_ADDRESS"),
                      account_index=env0.get("ARCUS_ACCOUNT_INDEX", 0),
-                     api_privkey_hex=env0.get("ARCUS_API_PRIVKEY"))
+                     api_privkey_hex=(env0.get("API_SIGNING_KEY")
+                                      or env0.get("ARCUS_API_PRIVKEY")))
 
 SETTING_LIMITS = {   # env anahtari: (min, max, tam sayi mi)
     "LEVERAGE": (1, 50, True),
@@ -119,6 +122,7 @@ PAGE = """<!doctype html>
 <pre id="log">...</pre>
 <div class="muted"><span data-i>foot</span></div>
 <script>
+var NET='__NET__';
 var I18N = {
  en:{title:'Arcus Trade Bot', running:'RUNNING (last tick {s}s ago)', offline:'BOT OFFLINE',
      nostate:'BOT OFFLINE (no state file)',
@@ -130,13 +134,15 @@ var I18N = {
      risk:'Risk Settings',
      riskwarn:'Higher leverage and larger margin mean faster losses as well as faster gains. '+
               'These settings apply to NEW positions within ~30 s; open positions keep their '+
-              'original SL/TP. Testnet = play money, experiment freely.',
+              'original SL/TP. '+(NET==='mainnet'
+                ? 'MAINNET = REAL money — size with care.'
+                : 'Testnet = play money, experiment freely.'),
      plow:'Low Risk', pmid:'Balanced', phigh:'High Risk', pdaily:'daily limit',
      lev:'Leverage (x)', margin:'Margin per trade ($)', sl:'Stop-loss (% of margin)',
      tp:'Take-profit (% of margin)', daily:'Max daily loss (%)', adx:'ADX threshold',
      symbols:'Symbols (comma separated)', save:'Save Settings',
      saved:'Saved — the bot applies it within ~30 s (next tick).',
-     err:'Error: ', events:'Events Log', foot:'auto-refresh every 10 s · testnet'},
+     err:'Error: ', events:'Events Log', foot:'auto-refresh every 10 s · '+NET},
  tr:{title:'Arcus Trade Bot', running:'ÇALIŞIYOR (son tick {s} sn önce)', offline:'BOT KAPALI',
      nostate:'BOT KAPALI (durum dosyası yok)',
      equity:'Equity', daypnl:'Günlük PnL', totpnl:'Toplam PnL', trades:'İşlem (W)',
@@ -147,13 +153,15 @@ var I18N = {
      risk:'Risk Ayarları',
      riskwarn:'Yüksek kaldıraç ve büyük teminat, kazancı olduğu kadar kaybı da hızlandırır. '+
               'Ayarlar ~30 sn içinde YENİ pozisyonlara uygulanır; açık pozisyonların SL/TP\\'si '+
-              'değişmez. Testnet = oyun parası, gönül rahatlığıyla dene.',
+              'değişmez. '+(NET==='mainnet'
+                ? 'MAINNET = GERÇEK para — teminatı dikkatli seç.'
+                : 'Testnet = oyun parası, gönül rahatlığıyla dene.'),
      plow:'Düşük Risk', pmid:'Dengeli', phigh:'Yüksek Risk', pdaily:'günlük limit',
      lev:'Kaldıraç (x)', margin:'İşlem başı teminat ($)', sl:'Stop-loss (teminatın %\\'si)',
      tp:'Take-profit (teminatın %\\'si)', daily:'Günlük azami zarar (%)', adx:'ADX eşiği',
      symbols:'Semboller (virgülle)', save:'Ayarları Kaydet',
      saved:'Kaydedildi — bot ~30 sn içinde (bir sonraki tick) uygular.',
-     err:'Hata: ', events:'Son Olaylar', foot:'10 sn\\'de bir yenilenir · testnet'}};
+     err:'Hata: ', events:'Son Olaylar', foot:'10 sn\\'de bir yenilenir · '+NET}};
 var PRESETS = {low:{lev:2,margin:50,sl:20,tp:40,daily:3,adx:25},
                mid:{lev:3,margin:100,sl:30,tp:60,daily:5,adx:20},
                high:{lev:5,margin:200,sl:40,tp:80,daily:10,adx:15}};
@@ -386,7 +394,8 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path.startswith("/api/settings"):
             self._send(200, json.dumps(current_settings()).encode())
         elif self.path == "/" or self.path.startswith("/index"):
-            self._send(200, PAGE.encode(), "text/html; charset=utf-8")
+            self._send(200, PAGE.replace("__NET__", NET_LABEL).encode(),
+                       "text/html; charset=utf-8")
         else:
             self._send(404, b'{"error":"not found"}')
 
