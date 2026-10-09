@@ -187,7 +187,8 @@ def main():
     last_report = time.time()
 
     if not flatten(m):
-        tg("Churn: acilista pozisyon kapatilamadi, HALT.")
+        tg("Churn: acilista pozisyon kapatilamadi — 30 dk sonra tekrar denenecek.")
+        time.sleep(1800)
         raise SystemExit("flatten basarisiz")
 
     while True:
@@ -200,9 +201,15 @@ def main():
             st["halted"] = True
             save_state(st)
             tg(f"Churn HALT: gunluk PnL {pnl_today:+.2f}$ siniri asti. "
-               f"Equity ${eq:.2f}. Yarin otomatik devam ETMEZ — elle baslat.")
-            log("gunluk zarar siniri — HALT")
-            return
+               f"Equity ${eq:.2f}. Gun donunce otomatik devam.")
+            log("gunluk zarar siniri — gun donusune kadar uyku")
+            while time.strftime("%Y-%m-%d") == st["day"]:
+                time.sleep(300)
+            st.update(day=time.strftime("%Y-%m-%d"),
+                      day_start_equity=equity(), halted=False)
+            save_state(st)
+            tg("Churn: yeni gun basladi, devam ediliyor.")
+            continue
 
         # 1) giris: en iyi alisa ALO
         filled = Decimal(0)
