@@ -33,7 +33,7 @@ STATE_PATH = os.path.join(BASE_DIR, "churn_state.json")
 env = dotenv_values(os.path.join(BASE_DIR, ".env"))
 
 SYMBOL = (env.get("CHURN_SYMBOL") or "BTC-USD").strip()
-REPRICE_SEC = int(env.get("CHURN_REPRICE_SEC") or 20)      # dolmayan emri tazeleme
+REPRICE_SEC = int(env.get("CHURN_REPRICE_SEC") or 30)      # dolmayan emri tazeleme
 PAUSE_SEC = int(env.get("CHURN_PAUSE_SEC") or 45)          # donguler arasi nefes
 MAX_DAILY_LOSS = float(env.get("CHURN_MAX_DAILY_LOSS_USD") or 0.50)
 MAX_REPRICE = int(env.get("CHURN_MAX_REPRICE") or 8)       # cikista IOC'a dusme esigi
@@ -61,6 +61,39 @@ def tg(text):
 
 def log(msg):
     print(time.strftime("%H:%M:%S"), msg, flush=True)
+
+
+def backoff_429(e):
+    """Sunucu 429 dondurdugunde soyledigi sureyi bekle (nazik istemci)."""
+    try:
+        d = json.loads(e.body)
+        ms = int(d.get("retryAfterMs") or d.get("retryAfter") or 0)
+    except Exception:
+        ms = 0
+    wait = max(30.0, min(300.0, ms / 1000.0 + 1))
+    log(f"rate limit — {wait:.0f} sn bekleniyor")
+    time.sleep(wait)
+
+
+def cancel_quiet(order_id):
+    """Tek emri iptal et; 429'da sunucuyu dinleyip bekle."""
+    try:
+        client.cancel_order(SYMBOL, order_id=order_id)
+    except ArcusError as e:
+        if e.status == 429:
+            backoff_429(e)
+        else:
+            log(f"cancel: {e.status} {e.body[:60]}")
+
+
+def my_open_orders():
+    try:
+        return client.open_orders().get("orders") or []
+    except ArcusError as e:
+        if e.status == 429:
+            backoff_429(e)
+            return []
+        raise
 
 
 def equity():
@@ -105,22 +138,16 @@ def wait_fill_or_cancel(order_id, want_qty):
     t0 = time.time()
     while time.time() - t0 < REPRICE_SEC:
         time.sleep(3)
-        oo = client.open_orders().get("orders") or []
+        oo = my_open_orders()
         mine = next((o for o in oo if str(o.get("orderId")) == str(order_id)), None)
         if mine is None:                       # kitapta yok: doldu ya da dustu
             return want_qty
         rem = Decimal(str(mine.get("remainingQuantity")
                           or mine.get("quantity") or want_qty))
         if rem < want_qty:                     # kismi dolum — kalani iptal et
-            try:
-                client.cancel_order(SYMBOL, order_id=order_id)
-            except ArcusError:
-                pass
+            cancel_quiet(order_id)
             return want_qty - rem
-    try:
-        client.cancel_order(SYMBOL, order_id=order_id)
-    except ArcusError:
-        pass
+    cancel_quiet(order_id)
     return Decimal(0)
 
 
@@ -135,7 +162,10 @@ def taker_close(qty_signed, m):
         log(f"taker kurtarma: {side} {abs(qty_signed)}")
         return True
     except ArcusError as e:
-        log(f"taker kurtarma reddi: {e.status} {e.body[:80]}")
+        if e.status == 429:
+            backoff_429(e)
+        else:
+            log(f"taker kurtarma reddi: {e.status} {e.body[:80]}")
         return False
 
 
@@ -147,21 +177,42 @@ def save_state(st):
 
 
 def flatten(m):
-    """Kalinti pozisyonu maker-oncelikli kapat; tikanirsa taker."""
-    for attempt in range(MAX_REPRICE + 1):
-        q = position_qty()
-        if q == 0:
-            return True
-        cancel_all_mine()
-        if attempt >= MAX_REPRICE:
-            return taker_close(q, m) and position_qty() == 0
-        bid, ask = best_prices()
-        side = "SELL" if q > 0 else "BUY"
-        px = ask if q > 0 else bid
-        oid = place_maker(side, abs(q), px, reduce_only=True)
-        if oid:
-            wait_fill_or_cancel(oid, abs(q))
-    return position_qty() == 0
+    """Kalinti pozisyonu SABIRLA kapat: tek reduceOnly ALO kitapta dursun,
+    yalnizca fiyat 5 tik'ten fazla uzaklasirsa tazele (tek emir iptali).
+    Uzun tikanmada tek IOC dener. 429'da sunucunun dedigi kadar bekler."""
+    tick = Decimal(str(m["tickSize"]))
+    laps = 0
+    while True:
+        try:
+            q = position_qty()
+            if q == 0:
+                return True
+            laps += 1
+            side = "SELL" if q > 0 else "BUY"
+            bid, ask = best_prices()
+            target = ask if q > 0 else bid
+            resting = [o for o in my_open_orders() if o.get("reduceOnly")]
+            if resting:
+                px = Decimal(str(resting[0].get("price") or 0))
+                if abs(px - target) <= tick * 5 and laps <= MAX_REPRICE * 3:
+                    time.sleep(REPRICE_SEC)    # fiyat yakin: dolmasini bekle
+                    continue
+                cancel_quiet(resting[0].get("orderId"))
+                time.sleep(2)
+                continue
+            if laps > MAX_REPRICE * 3:
+                taker_close(q, m)
+                time.sleep(10)                 # sonraki turda pozisyonu olc
+                continue
+            if place_maker(side, abs(q), target, reduce_only=True) is None:
+                time.sleep(5)                  # ALO reddi: kisa bekle, tekrar
+            else:
+                time.sleep(5)                  # emir kitapta; sonraki tur olcer
+        except ArcusError as e:
+            if e.status == 429:
+                backoff_429(e)
+                continue
+            raise
 
 
 _LOCK = socket.socket()   # tek-ornek kilidi: ikinci kopya baslarsa kendini kapatir
@@ -224,23 +275,33 @@ def main():
             tg("Churn: yeni gun basladi, devam ediliyor.")
             continue
 
-        # 1) giris: en iyi alisa ALO
+        # 1) giris: en iyi alisa ALO (yatan emir varsa onu bekle, 429'da sabret)
         filled = Decimal(0)
         for _ in range(MAX_REPRICE):
-            bid, ask = best_prices()
-            oid = place_maker("BUY", qty, bid)
-            if oid is None:
-                time.sleep(2)
-                continue
-            wait_fill_or_cancel(oid, qty)
-            filled = abs(position_qty())      # yer gercegi: pozisyondan oku
+            try:
+                resting = [o for o in my_open_orders() if not o.get("reduceOnly")]
+                if resting:
+                    wait_fill_or_cancel(resting[0].get("orderId"), qty)
+                else:
+                    bid, _a = best_prices()
+                    oid = place_maker("BUY", qty, bid)
+                    if oid is None:
+                        time.sleep(5)
+                        continue
+                    wait_fill_or_cancel(oid, qty)
+                filled = abs(position_qty())  # yer gercegi: pozisyondan oku
+            except ArcusError as e:
+                if e.status == 429:
+                    backoff_429(e)
+                    continue
+                raise
             if filled > 0:
                 break
         if filled == 0:
             time.sleep(PAUSE_SEC)
             continue
         st["entry_fills"] += 1
-        st["volume_usd"] += float(filled * bid)
+        st["volume_usd"] += float(filled) * float(best_prices()[0])
 
         # 2) cikis: en iyi satisa reduceOnly ALO; tikanirsa taker
         if not flatten(m):
