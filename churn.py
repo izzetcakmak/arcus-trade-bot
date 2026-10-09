@@ -16,6 +16,7 @@ Calistirma: python churn.py           (surekli)
 
 import json
 import os
+import socket
 import sys
 import time
 import urllib.parse
@@ -163,7 +164,19 @@ def flatten(m):
     return position_qty() == 0
 
 
+_LOCK = socket.socket()   # tek-ornek kilidi: ikinci kopya baslarsa kendini kapatir
+
+
+def acquire_lock():
+    try:
+        _LOCK.bind(("127.0.0.1", int(env.get("CHURN_LOCK_PORT") or 8399)))
+    except OSError:
+        log("baska bir churn kopyasi zaten calisiyor — cikiliyor")
+        sys.exit(0)
+
+
 def main():
+    acquire_lock()
     once = "--once" in sys.argv
     m = client.market(SYMBOL)
     step = Decimal(m["stepSize"])
