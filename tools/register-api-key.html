@@ -96,6 +96,23 @@ document.getElementById('go').onclick = async function(){
         'Switch MetaMask to the expected account and click again.</div>');
    btn.disabled = false; return;
   }
+  // MetaMask, domain.chainId aktif agla eslesmezse imzayi reddediyor — gec/ekle.
+  var want = '0x' + CHAIN.toString(16);
+  var cur = await ethereum.request({method:'eth_chainId'});
+  if(cur !== want){
+   try{
+    await ethereum.request({method:'wallet_switchEthereumChain', params:[{chainId: want}]});
+   }catch(sw){
+    if(sw && (sw.code === 4902 || /unrecognized|not added/i.test(sw.message||''))){
+     await ethereum.request({method:'wallet_addEthereumChain', params:[{
+      chainId: want, chainName: 'Robinhood Chain',
+      rpcUrls: ['https://rpc.mainnet.chain.robinhood.com'],
+      nativeCurrency: {name:'Ether', symbol:'ETH', decimals:18},
+      blockExplorerUrls: ['https://robinhoodchain.blockscout.com']}]});
+    } else { throw sw; }
+   }
+   show('<div>Switched wallet network to chainId ' + CHAIN + ' (you can switch back after signing).</div>');
+  }
   var sig = await ethereum.request({method:'eth_signTypedData_v4',
                                     params:[acct, JSON.stringify(TYPED)]});
   show('<div>Signature: <span class="mono">' + sig + '</span></div>');
