@@ -23,10 +23,11 @@
 <body>
 <h1>Arcus API Key Register</h1>
 <p class="muted">Registers an Ed25519 public key for your wallet via
-<code>POST /v1/createApiKey</code>. Your wallet only produces a
-<code>personal_sign</code> signature of the message shown below — no
-transaction, no gas, no fund movement. The private signing key never leaves
-your <code>.env</code>; this page only handles the public half.</p>
+<code>POST /v1/createApiKey</code>. Your wallet only produces an
+<b>EIP-712 typed-data signature</b> (<code>eth_signTypedData_v4</code>) of the
+message shown below — no transaction, no gas, no fund movement. The private
+signing key never leaves your <code>.env</code>; this page only handles the
+public half. Re-registering a key you already own just renews it.</p>
 
 <div class="card">
  <table>
@@ -49,10 +50,28 @@ var BASE  = q.get('base')  || 'https://api.arcus.xyz';
 var ADDR  = (q.get('address') || '').trim();
 var PUB   = (q.get('pub') || '').trim().toLowerCase().replace(/^0x/,'');
 var NAME  = q.get('name')  || 'arcus-trade-bot';
-var UNTIL = parseInt(q.get('until') || (Date.now() + 365*86400*1000), 10);
-// Canonical message: exact key order, no whitespace (gateway rebuilds & ecrecovers).
-var MESSAGE = '{"apiWalletName":"' + NAME + '","apiWalletPublicKey":"' + PUB +
-              '","validUntil":' + UNTIL + '}';
+var UNTIL = parseInt(q.get('until') || (Date.now() + 175*86400*1000), 10);
+var CHAIN = parseInt(q.get('chain') || '4663', 10);   // rootchain: production 4663, testnet 46630
+// EIP-712 typed data (index-less CreateApiKey type = accountIndex 0).
+var TYPED = {
+ types: {
+  EIP712Domain: [
+   {name:'name', type:'string'},
+   {name:'version', type:'string'},
+   {name:'chainId', type:'uint256'}
+  ],
+  CreateApiKey: [
+   {name:'apiWalletName',      type:'string'},
+   {name:'apiWalletPublicKey', type:'string'},
+   {name:'validUntil',         type:'uint256'}
+  ]
+ },
+ domain: {name:'Arcus API Key', version:'1', chainId: CHAIN},
+ primaryType: 'CreateApiKey',
+ message: {apiWalletName: NAME, apiWalletPublicKey: PUB, validUntil: UNTIL}
+};
+var MESSAGE = JSON.stringify(TYPED.message, null, 1) +
+              '\n\ndomain: ' + JSON.stringify(TYPED.domain);
 
 document.getElementById('v_base').textContent  = BASE;
 document.getElementById('v_addr').textContent  = ADDR || '(connect wallet)';
@@ -77,9 +96,8 @@ document.getElementById('go').onclick = async function(){
         'Switch MetaMask to the expected account and click again.</div>');
    btn.disabled = false; return;
   }
-  var hexMsg = '0x' + Array.from(new TextEncoder().encode(MESSAGE))
-                           .map(function(b){return b.toString(16).padStart(2,'0');}).join('');
-  var sig = await ethereum.request({method:'personal_sign', params:[hexMsg, acct]});
+  var sig = await ethereum.request({method:'eth_signTypedData_v4',
+                                    params:[acct, JSON.stringify(TYPED)]});
   show('<div>Signature: <span class="mono">' + sig + '</span></div>');
   var r = '0x' + sig.slice(2,66), s = '0x' + sig.slice(66,130);
   var v = parseInt(sig.slice(130,132),16); if(v < 27) v += 27;
