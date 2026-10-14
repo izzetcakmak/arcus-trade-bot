@@ -256,6 +256,9 @@ def main():
         raise SystemExit("flatten basarisiz")
 
     while True:
+      # Gecici ag/sunucu hatalari (SSL timeout, baglanti kopmasi, 5xx) surecin
+      # olmesine YOL ACMASIN — logla, bekle, devam et. Bot-tarafi kalicilik.
+      try:
         # gun devri + koruma
         if time.strftime("%Y-%m-%d") != st["day"]:
             st.update(day=time.strftime("%Y-%m-%d"), day_start_equity=equity())
@@ -325,6 +328,15 @@ def main():
                 f"PnL {eq - st['day_start_equity']:+.4f}$")
             return
         time.sleep(PAUSE_SEC)
+      except ArcusError as e:
+        if e.status == 429:
+            backoff_429(e)
+        else:
+            log(f"arcus hata: {e.status} {e.body[:80]} — 30 sn")
+            time.sleep(30)
+      except Exception as e:
+        log(f"gecici hata: {type(e).__name__}: {e} — 30 sn bekle")
+        time.sleep(30)
 
 
 if __name__ == "__main__":
